@@ -9,9 +9,7 @@ async function normalizePdfOrientation(file, startPage = 1, endPage = null) {
         const page = pdfDoc.getPage(i);
 
         const { width, height } = page.getSize();
-        const rotationObj = page.getRotation();
-        const currentRotation = rotationObj ? rotationObj.angle : 0;
-
+        const currentRotation = page.getRotation()?.angle || 0;
 
         console.log("Pagina", i+1, {
             width,
@@ -25,12 +23,14 @@ async function normalizePdfOrientation(file, startPage = 1, endPage = null) {
         const isLandscape = isLandscapeBySize || isLandscapeByRotation;
 
         if (isLandscape) {
-            page.setRotation(PDFLib.degrees(0));
+            // Ruota la pagina di 90° in senso antiorario
+            page.setRotation(PDFLib.degrees(90));
         }
     }
 
     return await pdfDoc.save();
 }
+
 
 
 
