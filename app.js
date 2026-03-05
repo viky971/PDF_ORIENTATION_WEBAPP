@@ -11,6 +11,12 @@ async function normalizePdfOrientation(file, startPage = 1, endPage = null) {
         const { width, height } = page.getSize();
         const currentRotation = page.getRotation().angle;
 
+        console.log("Pagina", i+1, {
+            width,
+            height,
+            rotation: currentRotation
+        });
+
         const isLandscapeBySize = width > height;
         const isLandscapeByRotation = currentRotation === 90 || currentRotation === 270;
 
@@ -23,6 +29,7 @@ async function normalizePdfOrientation(file, startPage = 1, endPage = null) {
 
     return await pdfDoc.save();
 }
+
 
 
 document.getElementById("processBtn").addEventListener("click", async () => {
