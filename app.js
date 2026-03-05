@@ -24,7 +24,7 @@ async function normalizePdfOrientation(file, startPage = 1, endPage = null) {
 
         if (isLandscape) {
             // Ruota la pagina di 90° in senso antiorario
-            page.setRotation(PDFLib.degrees(90));
+            page.setRotation(PDFLib.degrees(-90));
         }
     }
 
