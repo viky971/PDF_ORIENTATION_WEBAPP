@@ -9,7 +9,9 @@ async function normalizePdfOrientation(file, startPage = 1, endPage = null) {
         const page = pdfDoc.getPage(i);
 
         const { width, height } = page.getSize();
-        const currentRotation = page.getRotation().angle;
+        const rotationObj = page.getRotation();
+        const currentRotation = rotationObj ? rotationObj.angle : 0;
+
 
         console.log("Pagina", i+1, {
             width,
