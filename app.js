@@ -7,15 +7,23 @@ async function normalizePdfOrientation(file, startPage = 1, endPage = null) {
 
     for (let i = startPage - 1; i < lastPage; i++) {
         const page = pdfDoc.getPage(i);
-        const { width, height } = page.getSize();
 
-        if (width > height) {
-            page.setRotation(-90 * (Math.PI / 180));
+        const { width, height } = page.getSize();
+        const currentRotation = page.getRotation().angle;
+
+        const isLandscapeBySize = width > height;
+        const isLandscapeByRotation = currentRotation === 90 || currentRotation === 270;
+
+        const isLandscape = isLandscapeBySize || isLandscapeByRotation;
+
+        if (isLandscape) {
+            page.setRotation(PDFLib.degrees(0));
         }
     }
 
     return await pdfDoc.save();
 }
+
 
 document.getElementById("processBtn").addEventListener("click", async () => {
     const file = document.getElementById("pdfInput").files[0];
