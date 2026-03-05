@@ -2,29 +2,56 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <title>PDF Orientation WebApp</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>PDF Toolkit WebApp</title>
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
 </head>
+
 <body>
 
-    <h1>PDF Orientation</h1>
+    <h1>PDF Toolkit</h1>
 
     <div class="container">
 
         <label>Carica PDF:</label>
         <input type="file" id="pdfInput" accept="application/pdf">
 
-        <label>Pagina iniziale:</label>
-        <input type="number" id="startPage" value="1">
+        <h2>Rotazione automatica</h2>
+        <button id="autoRotateBtn">Correggi orientamento automatico</button>
 
-        <label>Pagina finale:</label>
-        <input type="number" id="endPage" value="9999">
+        <h2>Rotazione manuale</h2>
+        <label>Pagina:</label>
+        <input type="number" id="manualPage" min="1">
+        <label>Gradi (+90, -90, 180):</label>
+        <input type="number" id="manualDegrees" value="90">
+        <button id="manualRotateBtn">Ruota pagina</button>
 
-        <button id="processBtn">Correggi Orientamento</button>
+        <h2>Elimina pagine</h2>
+        <label>Pagine da eliminare (es: 2,5-7):</label>
+        <input type="text" id="deletePages">
+        <button id="deleteBtn">Elimina</button>
 
-        <a id="downloadLink" style="display:none;">Scarica PDF Corretto</a>
+        <h2>Estrai pagine</h2>
+        <label>Pagine da estrarre (es: 3-10):</label>
+        <input type="text" id="extractPages">
+        <button id="extractBtn">Estrai</button>
+
+        <h2>Unisci PDF</h2>
+        <label>Carica più PDF:</label>
+        <input type="file" id="mergeInput" accept="application/pdf" multiple>
+        <button id="mergeBtn">Unisci PDF</button>
+
+        <h2>Riordina pagine</h2>
+        <label>Nuovo ordine (es: 3,1,2,4):</label>
+        <input type="text" id="reorderPages">
+        <button id="reorderBtn">Riordina</button>
+
+        <h2>Tema</h2>
+        <button id="themeToggle">Cambia tema</button>
+
+        <br><br>
+        <a id="downloadLink" style="display:none;">Scarica PDF</a>
 
     </div>
 
@@ -33,3 +60,4 @@
 
 </body>
 </html>
+
