@@ -1,6 +1,6 @@
 {
-  "name": "PDF Toolkit",
-  "short_name": "PDF Toolkit",
+  "name": "PDF EDIPRESS",
+  "short_name": "PDF EDIPRESS",
   "description": "Strumenti PDF: rotazione, estrazione, unione, eliminazione e riordino pagine.",
   "start_url": "./index.html",
   "scope": "./",
