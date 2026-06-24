@@ -17,22 +17,31 @@
 async function normalizePdfOrientation(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+
     const totalPages = pdfDoc.getPageCount();
 
     for (let i = 0; i < totalPages; i++) {
         const page = pdfDoc.getPage(i);
+
         const { width, height } = page.getSize();
         
+        // Normalizza la rotazione corrente tra 0 e 360 gradi
         let currentRotation = (page.getRotation()?.angle || 0) % 360;
         if (currentRotation < 0) currentRotation += 360;
 
-        // Rileva se la pagina è disposta visivamente in orizzontale
+        console.log("Pagina", i + 1, {
+            width,
+            height,
+            rotation: currentRotation
+        });
+
+        // Rileva se la pagina è disposta visivamente in orizzontale incrociando dimensioni e rotazione nativa
         const isLandscape = (currentRotation === 0 || currentRotation === 180)
             ? (width > height)
             : (height > width);
 
         if (isLandscape) {
-            // Applica la rotazione relativa per portarla in verticale senza ribaltarla
+            // Calcola la rotazione relativa esatta per portarla in verticale senza ribaltarla
             let targetRotation = (currentRotation + 270) % 360;
             page.setRotation(PDFLib.degrees(targetRotation));
         }
@@ -42,7 +51,7 @@ async function normalizePdfOrientation(file) {
 }
 
 // -------------------------------
-// ESTRAZIONE IMMAGINI (SINGOLE, 300 DPI)
+// NUOVA FUNZIONE: ESTRAZIONE IMMAGINI (SINGOLE, 300 DPI)
 // -------------------------------
 async function exportPagesToImages(file, rangeString) {
     try {
@@ -52,7 +61,7 @@ async function exportPagesToImages(file, rangeString) {
         const totalPages = pdf.numPages;
         const targetPages = [];
         
-        // Parsifica la stringa delle pagine (es. "1, 3-5")
+        // Parsifica l'intervallo inserito (es. "1, 3-5")
         rangeString.split(",").forEach(part => {
             if (part.includes("-")) {
                 const [start, end] = part.split("-").map(n => parseInt(n.trim()));
@@ -71,7 +80,7 @@ async function exportPagesToImages(file, rangeString) {
             }
 
             const page = await pdf.getPage(pageNum);
-            const scale = 300 / 72; // Rapporto matematico costante per ottenere 300 DPI reali dai 72 nativi del PDF
+            const scale = 300 / 72; // Rapporto matematico costante per generare 300 DPI reali dai 72 nativi del PDF
             const viewport = page.getViewport({ scale: scale });
 
             const canvas = document.createElement('canvas');
@@ -82,7 +91,7 @@ async function exportPagesToImages(file, rangeString) {
             // Renderizza la pagina sul canvas temporaneo
             await page.render({ canvasContext: context, viewport: viewport }).promise;
             
-            // Esporta l'immagine ad altissima risoluzione (formato PNG, ideale per InDesign)
+            // Esporta in formato ad alta definizione PNG (perfetto per InDesign)
             const imgDataUrl = canvas.toDataURL('image/png');
             
             const link = document.createElement('a');
@@ -141,7 +150,7 @@ async function deletePages(pdfDoc, pagesToDelete) {
 }
 
 // -------------------------------
-// ESTRAZIONE PAGINE (IN PDF)
+// ESTRAZIONE PAGINE
 // -------------------------------
 async function extractPages(pdfDoc, range) {
     const newPdf = await PDFLib.PDFDocument.create();
@@ -209,6 +218,18 @@ function toggleTheme() {
     localStorage.setItem("theme", next);
 }
 
+function loadTheme() {
+    const saved = localStorage.getItem("theme");
+    if (saved) {
+        document.documentElement.setAttribute("data-theme", saved);
+    } else {
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
+    }
+}
+
+loadTheme();
+
 // -------------------------------
 // DOWNLOAD
 // -------------------------------
@@ -224,21 +245,19 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS (CORRETTI CON L'INDICE ZERO)
+// EVENT LISTENERS
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    const file = document.getElementById("pdfInput").files[0];
+    if (!file) return alert("Carica un PDF");
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
 });
 
 document.getElementById("manualRotateBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    const file = document.getElementById("pdfInput").files[0];
+    if (!file) return alert("Carica un PDF");
 
     const page = parseInt(document.getElementById("manualPage").value);
     const degrees = parseInt(document.getElementById("manualDegrees").value);
@@ -249,9 +268,8 @@ document.getElementById("manualRotateBtn").addEventListener("click", async () =>
 });
 
 document.getElementById("deleteBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    const file = document.getElementById("pdfInput").files[0];
+    if (!file) return alert("Carica un PDF");
 
     const pages = document.getElementById("deletePages").value;
 
@@ -261,54 +279,41 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("extractBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
-    
+    const file = document.getElementById("pdfInput").files[0];
+    if (!file) return alert("Carica un PDF");
     const pages = document.getElementById("extractPages").value;
-    
     const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
     const newPdf = await extractPages(pdfDoc, pages);
     download(await newPdf.save(), "PDF_estratto.pdf");
-    });
+});
 
-    document.getElementById("extractTiffBtn").addEventListener("click", async () => {
-        const input = document.getElementById("pdfInput");
-        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-        const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+// EVENT LISTENER PER IL NUOVO TASTO HD
+document.getElementById("extractTiffBtn").addEventListener("click", async () => {
+    const file = document.getElementById("pdfInput").files[0];
+    if (!file) return alert("Carica un PDF");
 
-        const pages = document.getElementById("extractTiffPages").value;
-        if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
+    const pages = document.getElementById("extractTiffPages").value;
+    if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
 
-        await exportPagesToImages(file, pages);
-    });
+    await exportPagesToImages(file, pages);
+});
 
-    document.getElementById("mergeBtn").addEventListener("click", async () => {
-        const files = document.getElementById("mergeInput").files;
-        if (!files || files.length === 0) return alert("Carica almeno due PDF");
+document.getElementById("mergeBtn").addEventListener("click", async () => {
+    const files = document.getElementById("mergeInput").files;
+    if (!files.length) return alert("Carica almeno due PDF");
 
-        const newPdf = await mergePDFs(files);
-        download(await newPdf.save(), "PDF_unito.pdf");
-    });
+    const newPdf = await mergePDFs(files);
+    download(await newPdf.save(), "PDF_unito.pdf");
+});
 
-    document.getElementById("reorderBtn").addEventListener("click", async () => {
-        const input = document.getElementById("pdfInput");
-        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-        const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+document.getElementById("reorderBtn").addEventListener("click", async () => {
+    const file = document.getElementById("pdfInput").files[0];
+    if (!file) return alert("Carica un PDF");
 
-        const order = document.getElementById("reorderPages").value;
-        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-        const newPdf = await reorderPages(pdfDoc, order);
-        download(await newPdf.save(), "PDF_riordinato.pdf");
-    });
+    const order = document.getElementById("reorderPages").value;
+    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+    const newPdf = await reorderPages(pdfDoc, order);
+    download(await newPdf.save(), "PDF_riordinato.pdf");
+});
 
-    // Inizializzazione tema all'avvio
-    (() => {
-        const saved = localStorage.getItem("theme");
-        if (saved) {
-            document.documentElement.setAttribute("data-theme", saved);
-        } else {
-            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-            document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
-        }
-    })();
+document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
