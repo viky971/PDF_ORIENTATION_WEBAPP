@@ -4,16 +4,15 @@
     <meta charset="UTF-8">
     <title>PDF Tool per InDesign</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Libreria nativa locale -->
+    <!-- Manteniamo solo la libreria per la manipolazione strutturale del file -->
     <script src="pdf-lib.min.js"></script>
-    <!-- Caricamento online stabile di PDF.js -->
-    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
     <h1>PDF Tool per InDesign</h1>
 
     <div class="container">
+        <!-- SELEZIONE FILE PRINCIPALE -->
         <h2>Seleziona PDF</h2>
         <input type="file" id="pdfInput" accept="application/pdf">
 
@@ -21,7 +20,7 @@
         <h2>Rotazione Automatica</h2>
         <button id="autoRotateBtn">Raddrizza Pagine Orizzontali</button>
 
-        <!-- SOSTITUZIONE SCANSIONI -->
+        <!-- SOSTITUZIONE SCANSIONI (Estrazione singole immagini HD) -->
         <h2>Sostituzione Scansioni</h2>
         <label for="extractTiffPages">Estrai pagine in HD (300 DPI):</label>
         <input type="text" id="extractTiffPages" placeholder="Es. 1, 3-5">
@@ -58,10 +57,11 @@
         <input type="text" id="reorderPages" placeholder="Es. 3, 2, 1, 4">
         <button id="reorderBtn">Riordina Pagine</button>
 
+        <!-- SEZIONE CAMBIO TEMA -->
         <h2>Interfaccia</h2>
         <button id="themeToggleBtn" onclick="toggleTheme()">Cambia Tema 🌓</button>
 
-        <!-- AREA DI DOWNLOAD -->
+        <!-- LINK DOWNLOAD -->
         <a id="downloadLink" style="display: none;"></a>
     </div>
 
