@@ -1,38 +1,83 @@
+// Impostazione del worker per PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
+
 // -------------------------------
-// ROTAZIONE AUTOMATICA
+// ROTAZIONE AUTOMATICA (CORRETTA)
 // -------------------------------
 async function normalizePdfOrientation(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-
     const totalPages = pdfDoc.getPageCount();
 
     for (let i = 0; i < totalPages; i++) {
         const page = pdfDoc.getPage(i);
-
         const { width, height } = page.getSize();
-        const currentRotation = page.getRotation()?.angle || 0;
+        
+        // Risolve le anomalie sulle rotazioni negative o superiori a 360°
+        let currentRotation = (page.getRotation()?.angle || 0) % 360;
+        if (currentRotation < 0) currentRotation += 360;
 
-        console.log("Pagina", i + 1, {
-            width,
-            height,
-            rotation: currentRotation
-        });
-
-        const isLandscapeBySize = width > height;
-        const isLandscapeByRotation = currentRotation === 90 || currentRotation === 270;
-
-        const isLandscape = isLandscapeBySize || isLandscapeByRotation;
+        // Incrocia le dimensioni geometriche con la rotazione per capire l'orientamento visivo reale
+        const isLandscape = (currentRotation === 0 || currentRotation === 180) 
+            ? (width > height) 
+            : (height > width);
 
         if (isLandscape) {
-            page.setRotation(PDFLib.degrees(-90)); // rotazione antioraria
+            // Calcola lo spostamento corretto relativo senza azzerare o capovolgere la pagina
+            let targetRotation = (currentRotation + 270) % 360;
+            page.setRotation(PDFLib.degrees(targetRotation));
         }
     }
 
     return await pdfDoc.save();
 }
 
+// -------------------------------
+// ESTRAZIONE IMMAGINI AD ALTA RISOLUZIONE (300 DPI)
+// -------------------------------
+async function exportPagesToImages(file, rangeString) {
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    const totalPages = pdf.numPages;
+    const targetPages = [];
+    
+    // Parsifica la stringa (es. "1, 3-5")
+    rangeString.split(",").forEach(part => {
+        if (part.includes("-")) {
+            const [start, end] = part.split("-").map(n => parseInt(n.trim()));
+            for (let i = start; i <= end; i++) targetPages.push(i);
+        } else {
+            targetPages.push(parseInt(part.trim()));
+        }
+    });
 
+    for (const pageNum of targetPages) {
+        if (pageNum < 1 || pageNum > totalPages) continue;
+
+        const page = await pdf.getPage(pageNum);
+        // Il PDF nativo è a 72 DPI. Per portarlo a 300 DPI serve un moltiplicatore di scala pari a 4.1666
+        const scale = 300 / 72;
+        const viewport = page.getViewport({ scale: scale });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        await page.render({ canvasContext: context, viewport: viewport }).promise;
+        
+        // Genera un file PNG non compresso ad altissima risoluzione, perfetto da importare su InDesign
+        const imgDataUrl = canvas.toDataURL('image/png');
+        
+        const link = document.createElement('a');
+        link.href = imgDataUrl;
+        link.download = `Pagina_${pageNum}_300dpi.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
 
 // -------------------------------
 // ROTAZIONE MANUALE
@@ -42,8 +87,6 @@ async function rotatePage(pdfDoc, pageNumber, degrees) {
     page.setRotation(PDFLib.degrees(degrees));
     return pdfDoc;
 }
-
-
 
 // -------------------------------
 // ELIMINAZIONE PAGINE
@@ -72,8 +115,6 @@ async function deletePages(pdfDoc, pagesToDelete) {
     return newPdf;
 }
 
-
-
 // -------------------------------
 // ESTRAZIONE PAGINE
 // -------------------------------
@@ -101,8 +142,6 @@ async function extractPages(pdfDoc, range) {
     return newPdf;
 }
 
-
-
 // -------------------------------
 // UNIONE PDF
 // -------------------------------
@@ -120,8 +159,6 @@ async function mergePDFs(files) {
     return merged;
 }
 
-
-
 // -------------------------------
 // RIORDINAMENTO PAGINE
 // -------------------------------
@@ -136,8 +173,6 @@ async function reorderPages(pdfDoc, orderString) {
 
     return newPdf;
 }
-
-
 
 // -------------------------------
 // TEMA CHIARO/SCURO
@@ -161,8 +196,6 @@ function loadTheme() {
 
 loadTheme();
 
-
-
 // -------------------------------
 // DOWNLOAD
 // -------------------------------
@@ -177,22 +210,19 @@ function download(bytes, filename) {
     link.textContent = "Scarica " + filename;
 }
 
-
-
 // -------------------------------
-// EVENT LISTENERS
+// EVENT LISTENERS (CORRETTI CON INDICE)
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
+    const file = document.getElementById("pdfInput").files[0]; // <--- Corretto [0]
     if (!file) return alert("Carica un PDF");
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
 });
 
-
 document.getElementById("manualRotateBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
+    const file = document.getElementById("pdfInput").files[0]; // <--- Corretto [0]
     if (!file) return alert("Carica un PDF");
 
     const page = parseInt(document.getElementById("manualPage").value);
@@ -203,9 +233,8 @@ document.getElementById("manualRotateBtn").addEventListener("click", async () =>
     download(await newPdf.save(), "PDF_ruotato.pdf");
 });
 
-
 document.getElementById("deleteBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
+    const file = document.getElementById("pdfInput").files[0]; // <--- Corretto [0]
     if (!file) return alert("Carica un PDF");
 
     const pages = document.getElementById("deletePages").value;
@@ -215,9 +244,8 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
     download(await newPdf.save(), "PDF_senza_pagine.pdf");
 });
 
-
 document.getElementById("extractBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
+    const file = document.getElementById("pdfInput").files[0]; // <--- Corretto [0]
     if (!file) return alert("Carica un PDF");
 
     const pages = document.getElementById("extractPages").value;
@@ -227,18 +255,26 @@ document.getElementById("extractBtn").addEventListener("click", async () => {
     download(await newPdf.save(), "PDF_estratto.pdf");
 });
 
+document.getElementById("extractTiffBtn").addEventListener("click", async () => {
+    const file = document.getElementById("pdfInput").files[0]; // <--- Corretto [0]
+    if (!file) return alert("Carica un PDF");
+
+    const pages = document.getElementById("extractTiffPages").value;
+    if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
+
+    await exportPagesToImages(file, pages);
+});
 
 document.getElementById("mergeBtn").addEventListener("click", async () => {
-    const files = document.getElementById("mergeInput").files;
+    const files = document.getElementById("mergeInput").files; // Rimane così perché accetta file multipli
     if (!files.length) return alert("Carica almeno due PDF");
 
     const newPdf = await mergePDFs(files);
     download(await newPdf.save(), "PDF_unito.pdf");
 });
 
-
 document.getElementById("reorderBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
+    const file = document.getElementById("pdfInput").files[0]; // <--- Corretto [0]
     if (!file) return alert("Carica un PDF");
 
     const order = document.getElementById("reorderPages").value;
@@ -247,7 +283,3 @@ document.getElementById("reorderBtn").addEventListener("click", async () => {
     const newPdf = await reorderPages(pdfDoc, order);
     download(await newPdf.save(), "PDF_riordinato.pdf");
 });
-
-
-document.getElementById("themeToggle").addEventListener("click", toggleTheme);
-

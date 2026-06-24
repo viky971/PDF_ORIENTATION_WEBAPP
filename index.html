@@ -1,63 +1,71 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <title>PDF EDIPRESS WebApp</title>
+    <title>PDF Tool per InDesign</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+    <script src="pdf-lib.min.js"></script>
+    <!-- Libreria locale per il rendering a 300 DPI -->
+    <script src="pdf.min.js"></script>
 </head>
-
 <body>
 
-    <h1>PDF EDIPRESS</h1>
+    <h1>PDF Tool per InDesign</h1>
 
     <div class="container">
-
-        <label>Carica PDF:</label>
+        <!-- SELEZIONE FILE FILE UNICO -->
+        <h2>Seleziona PDF</h2>
         <input type="file" id="pdfInput" accept="application/pdf">
 
-        <h2>Rotazione automatica</h2>
-        <button id="autoRotateBtn">Correggi orientamento automatico</button>
+        <!-- 1. ROTAZIONE AUTOMATICA -->
+        <h2>Rotazione Automatica</h2>
+        <button id="autoRotateBtn">Raddrizza Pagine Orizzontali</button>
 
-        <h2>Rotazione manuale</h2>
-        <label>Pagina:</label>
-        <input type="number" id="manualPage" min="1">
-        <label>Gradi (+90, -90, 180):</label>
-        <input type="number" id="manualDegrees" value="90">
-        <button id="manualRotateBtn">Ruota pagina</button>
+        <!-- NOUVA FUNZIONE: ESTRAZIONE IMMAGINI HD -->
+        <h2>Sostituzione Scansioni</h2>
+        <label for="extractTiffPages">Estrai pagine in HD (300 DPI):</label>
+        <input type="text" id="extractTiffPages" placeholder="Es. 1, 3-5">
+        <button id="extractTiffBtn">Esporta Immagini HD</button>
 
-        <h2>Elimina pagine</h2>
-        <label>Pagine da eliminare (es: 2,5-7):</label>
-        <input type="text" id="deletePages">
-        <button id="deleteBtn">Elimina</button>
+        <!-- 2. ROTAZIONE MANUALE -->
+        <h2>Rotazione Manuale</h2>
+        <label for="manualPage">Numero pagina:</label>
+        <input type="number" id="manualPage" min="1" placeholder="Es. 1">
+        <label for="manualDegrees">Gradi:</label>
+        <input type="number" id="manualDegrees" placeholder="Es. 90, 180, 270">
+        <button id="manualRotateBtn">Ruota Pagina</button>
 
-        <h2>Estrai pagine</h2>
-        <label>Pagine da estrarre (es: 3-10):</label>
-        <input type="text" id="extractPages">
-        <button id="extractBtn">Estrai</button>
+        <!-- 3. ELIMINAZIONE PAGINE -->
+        <h2>Elimina Pagine</h2>
+        <label for="deletePages">Pagine da eliminare:</label>
+        <input type="text" id="deletePages" placeholder="Es. 2, 4-6">
+        <button id="deleteBtn">Elimina Pagine</button>
 
-        <h2>Unisci PDF</h2>
-        <label>Carica più PDF:</label>
+        <!-- 4. ESTRAZIONE PAGINE -->
+        <h2>Estrai Pagine (in PDF)</h2>
+        <label for="extractPages">Intervallo pagine:</label>
+        <input type="text" id="extractPages" placeholder="Es. 1-3, 5">
+        <button id="extractBtn">Estrai Pagine</button>
+
+        <!-- 5. UNIONE PDF -->
+        <h2>Unisci più PDF</h2>
         <input type="file" id="mergeInput" accept="application/pdf" multiple>
         <button id="mergeBtn">Unisci PDF</button>
 
-        <h2>Riordina pagine</h2>
-        <label>Nuovo ordine (es: 3,1,2,4):</label>
-        <input type="text" id="reorderPages">
-        <button id="reorderBtn">Riordina</button>
+        <!-- 6. RIORDINAMENTO PAGINE -->
+        <h2>Riordina Pagine</h2>
+        <label for="reorderPages">Nuovo ordine:</label>
+        <input type="text" id="reorderPages" placeholder="Es. 3, 2, 1, 4">
+        <button id="reorderBtn">Riordina Pagine</button>
 
-        <h2>Tema</h2>
-        <button id="themeToggle">Cambia tema</button>
+        <!-- SEZIONE CAMBIO TEMA -->
+        <h2>Interfaccia</h2>
+        <button id="themeToggleBtn" onclick="toggleTheme()">Cambia Tema 🌓</button>
 
-        <br><br>
-        <a id="downloadLink" style="display:none;">Scarica PDF</a>
-
+        <!-- LINK DOWNLOAD -->
+        <a id="downloadLink" style="display: none;"></a>
     </div>
 
-    <script src="pdf-lib.min.js"></script>
     <script src="app.js"></script>
-
 </body>
 </html>
-
