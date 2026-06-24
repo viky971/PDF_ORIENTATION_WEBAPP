@@ -218,19 +218,21 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS (CORRETTI CON INDICE 0)
+// EVENT LISTENERS CORRETTI CON L'INDICE [0] ESTESO
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
-    if (!file) return alert("Carica un PDF");
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0];
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
 });
 
 document.getElementById("manualRotateBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
-    if (!file) return alert("Carica un PDF");
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0];
 
     const page = parseInt(document.getElementById("manualPage").value);
     const degrees = parseInt(document.getElementById("manualDegrees").value);
@@ -241,8 +243,9 @@ document.getElementById("manualRotateBtn").addEventListener("click", async () =>
 });
 
 document.getElementById("deleteBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
-    if (!file) return alert("Carica un PDF");
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0];
 
     const pages = document.getElementById("deletePages").value;
 
@@ -252,8 +255,9 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("extractBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
-    if (!file) return alert("Carica un PDF");
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0];
 
     const pages = document.getElementById("extractPages").value;
 
@@ -263,8 +267,9 @@ document.getElementById("extractBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("extractTiffBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
-    if (!file) return alert("Carica un PDF");
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0];
 
     const pages = document.getElementById("extractTiffPages").value;
     if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
@@ -274,11 +279,17 @@ document.getElementById("extractTiffBtn").addEventListener("click", async () => 
 
 document.getElementById("mergeBtn").addEventListener("click", async () => {
     const files = document.getElementById("mergeInput").files;
-    if (!files.length) return alert("Carica almeno due PDF");
-
+    if (!files || files.length === 0) return alert("Carica almeno due PDF");
+    
     const newPdf = await mergePDFs(files);
-    download(await newPdf.save(), "PDF_unito.pdf");
-});
-
-document.getElementById("reorderBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0];
+    download(await newPdf.save(), "PDF_unito.pdf");});
+    
+    document.getElementById("reorderBtn").addEventListener("click", async () => {
+        const input = document.getElementById("pdfInput");
+        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+        const file = input.files[0];
+        
+        const order = document.getElementById("reorderPages").value;
+        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+        const newPdf = await reorderPages(pdfDoc, order);
+        download(await newPdf.save(), "PDF_riordinato.pdf");});
