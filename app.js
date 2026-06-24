@@ -305,4 +305,13 @@ document.getElementById("reorderBtn").addEventListener("click", async () => {
     download(await newPdf.save(), "PDF_riordinato.pdf");
 });
 
-// Inizializzazione tema all'avvio(() => {const saved = localStorage.getItem("theme");if (saved) {document.documentElement.setAttribute("data-theme", saved);} else {const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");}})();
+// Inizializzazione tema all'avvio
+(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved) {
+        document.documentElement.setAttribute("data-theme", saved);
+    } else {
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
+    }
+})();
