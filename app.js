@@ -1,5 +1,15 @@
-// Configurazione del worker online obbligatorio per PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
+// Configurazione del worker online per PDF.js convertito in Blob per evitare blocchi di sicurezza (CORS) su GitHub
+(async () => {
+    try {
+        const response = await fetch('https://cloudflare.com');
+        const workerCode = await response.text();
+        const workerBlob = new Blob([workerCode], { type: 'text/javascript' });
+        pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
+        console.log("Worker PDF.js configurato con successo via Blob URL.");
+    } catch (e) {
+        console.error("Errore nell'inizializzazione del worker online:", e);
+    }
+})();
 
 // -------------------------------
 // ROTAZIONE AUTOMATICA (CORRETTA)
@@ -208,10 +218,10 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS (CORRETTI CON INDICE [0])
+// EVENT LISTENERS (CORRETTI CON INDICE 0)
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0]; // <--- AGGIUNTO [0]
+    const file = document.getElementById("pdfInput").files[0];
     if (!file) return alert("Carica un PDF");
 
     const pdfBytes = await normalizePdfOrientation(file);
@@ -219,7 +229,7 @@ document.getElementById("autoRotateBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("manualRotateBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0]; // <--- AGGIUNTO [0]
+    const file = document.getElementById("pdfInput").files[0];
     if (!file) return alert("Carica un PDF");
 
     const page = parseInt(document.getElementById("manualPage").value);
@@ -231,7 +241,7 @@ document.getElementById("manualRotateBtn").addEventListener("click", async () =>
 });
 
 document.getElementById("deleteBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0]; // <--- AGGIUNTO [0]
+    const file = document.getElementById("pdfInput").files[0];
     if (!file) return alert("Carica un PDF");
 
     const pages = document.getElementById("deletePages").value;
@@ -242,7 +252,7 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("extractBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0]; // <--- AGGIUNTO [0]
+    const file = document.getElementById("pdfInput").files[0];
     if (!file) return alert("Carica un PDF");
 
     const pages = document.getElementById("extractPages").value;
@@ -253,7 +263,7 @@ document.getElementById("extractBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("extractTiffBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0]; // <--- AGGIUNTO [0]
+    const file = document.getElementById("pdfInput").files[0];
     if (!file) return alert("Carica un PDF");
 
     const pages = document.getElementById("extractTiffPages").value;
@@ -263,7 +273,7 @@ document.getElementById("extractTiffBtn").addEventListener("click", async () => 
 });
 
 document.getElementById("mergeBtn").addEventListener("click", async () => {
-    const files = document.getElementById("mergeInput").files; // Gestisce array nativo per file multipli
+    const files = document.getElementById("mergeInput").files;
     if (!files.length) return alert("Carica almeno due PDF");
 
     const newPdf = await mergePDFs(files);
@@ -271,10 +281,4 @@ document.getElementById("mergeBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("reorderBtn").addEventListener("click", async () => {
-    const file = document.getElementById("pdfInput").files[0]; // <--- AGGIUNTO [0]
-    if (!file) return alert("Carica un PDF");
-
-    const order = document.getElementById("reorderPages").value;
-
-    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-    const newPdf = await reorderPages(pdfDoc, order);
+    const file = document.getElementById("pdfInput").files[0];
