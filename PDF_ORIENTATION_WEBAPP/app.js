@@ -1,15 +1,5 @@
-// Configurazione del worker online per PDF.js convertito in Blob per evitare blocchi di sicurezza (CORS) su GitHub
-(async () => {
-    try {
-        const response = await fetch('https://cloudflare.com');
-        const workerCode = await response.text();
-        const workerBlob = new Blob([workerCode], { type: 'text/javascript' });
-        pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
-        console.log("Worker PDF.js configurato con successo via Blob URL.");
-    } catch (e) {
-        console.error("Errore nell'inizializzazione del worker online:", e);
-    }
-})();
+// Configurazione standard del worker online per PDF.js (Stabile per GitHub Pages)
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
 
 // -------------------------------
 // ROTAZIONE AUTOMATICA (CORRETTA)
@@ -45,44 +35,62 @@ async function normalizePdfOrientation(file) {
 // ESTRAZIONE IMMAGINI (SINGOLE, 300 DPI)
 // -------------------------------
 async function exportPagesToImages(file, rangeString) {
-    const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    const pdf = await loadingTask.promise;
-    const totalPages = pdf.numPages;
-    const targetPages = [];
-    
-    rangeString.split(",").forEach(part => {
-        if (part.includes("-")) {
-            const [start, end] = part.split("-").map(n => parseInt(n.trim()));
-            for (let i = start; i <= end; i++) targetPages.push(i);
-        } else {
-            targetPages.push(parseInt(part.trim()));
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const totalPages = pdf.numPages;
+        const targetPages = [];
+        
+        // Parsifica la stringa delle pagine (es. "1, 3-5")
+        rangeString.split(",").forEach(part => {
+            if (part.includes("-")) {
+                const [start, end] = part.split("-").map(n => parseInt(n.trim()));
+                for (let i = start; i <= end; i++) targetPages.push(i);
+            } else {
+                targetPages.push(parseInt(part.trim()));
+            }
+        });
+
+        let pagineElaborate = 0;
+
+        for (const pageNum of targetPages) {
+            if (pageNum < 1 || pageNum > totalPages) {
+                alert(`La pagina ${pageNum} non esiste in questo PDF.`);
+                continue;
+            }
+
+            const page = await pdf.getPage(pageNum);
+            const scale = 300 / 72; // Rapporto matematico costante per ottenere 300 DPI reali dai 72 nativi del PDF
+            const viewport = page.getViewport({ scale: scale });
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            // Renderizza la pagina sul canvas temporaneo
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+            
+            // Esporta l'immagine ad altissima risoluzione (formato PNG, ideale per InDesign)
+            const imgDataUrl = canvas.toDataURL('image/png');
+            
+            const link = document.createElement('a');
+            link.href = imgDataUrl;
+            link.download = `Pagina_${pageNum}_300dpi.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            pagineElaborate++;
         }
-    });
 
-    for (const pageNum of targetPages) {
-        if (pageNum < 1 || pageNum > totalPages) continue;
+        if (pagineElaborate === 0) {
+            alert("Nessuna pagina valida è stata inserita.");
+        }
 
-        const page = await pdf.getPage(pageNum);
-        const scale = 300 / 72; // Genera 300 DPI reali convertendo i 72 pixel nativi del PDF
-        const viewport = page.getViewport({ scale: scale });
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        await page.render({ canvasContext: context, viewport: viewport }).promise;
-        
-        // Esporta in formato ad alta definizione PNG
-        const imgDataUrl = canvas.toDataURL('image/png');
-        
-        const link = document.createElement('a');
-        link.href = imgDataUrl;
-        link.download = `Pagina_${pageNum}_300dpi.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    } catch (error) {
+        console.error("Errore durante l'esportazione delle immagini:", error);
+        alert("Si è verificato un errore nel motore grafico. Controlla la console del browser.");
     }
 }
 
@@ -123,7 +131,7 @@ async function deletePages(pdfDoc, pagesToDelete) {
 }
 
 // -------------------------------
-// ESTRAZIONE PAGINE
+// ESTRAZIONE PAGINE (IN PDF)
 // -------------------------------
 async function extractPages(pdfDoc, range) {
     const newPdf = await PDFLib.PDFDocument.create();
@@ -191,18 +199,6 @@ function toggleTheme() {
     localStorage.setItem("theme", next);
 }
 
-function loadTheme() {
-    const saved = localStorage.getItem("theme");
-    if (saved) {
-        document.documentElement.setAttribute("data-theme", saved);
-    } else {
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
-    }
-}
-
-loadTheme();
-
 // -------------------------------
 // DOWNLOAD
 // -------------------------------
@@ -218,12 +214,12 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS CORRETTI CON L'INDICE [0] ESTESO
+// EVENT LISTENERS (CON CONFRONTO INDICE BLINDATO)
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
+    const file = input.files[0]; // Estrae il file singolo reale
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
@@ -269,6 +265,17 @@ document.getElementById("extractBtn").addEventListener("click", async () => {
 document.getElementById("extractTiffBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0]; // Estrae il file singolo reale
+
+    const pages = document.getElementById("extractTiffPages").value;
+    if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
+
+    await exportPagesToImages(file, pages);
+});
+
+document.getElementById("extractTiffBtn").addEventListener("click", async () => {
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
     
     // NOTA: Aggiungiamo [0] alla fine per estrarre il singolo file reale dalla lista
     const file = input.files[0];
@@ -297,3 +304,5 @@ document.getElementById("reorderBtn").addEventListener("click", async () => {
     const newPdf = await reorderPages(pdfDoc, order);
     download(await newPdf.save(), "PDF_riordinato.pdf");
 });
+
+// Inizializzazione tema all'avvio(() => {const saved = localStorage.getItem("theme");if (saved) {document.documentElement.setAttribute("data-theme", saved);} else {const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");}})();
