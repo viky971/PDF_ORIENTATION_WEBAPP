@@ -269,6 +269,8 @@ document.getElementById("extractBtn").addEventListener("click", async () => {
 document.getElementById("extractTiffBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    
+    // NOTA: Aggiungiamo [0] alla fine per estrarre il singolo file reale dalla lista
     const file = input.files[0];
 
     const pages = document.getElementById("extractTiffPages").value;
