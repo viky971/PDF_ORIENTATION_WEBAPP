@@ -1,35 +1,72 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Orientation WebApp</title>
+    <title>PDF Tool per InDesign</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+    <!-- Libreria nativa che hai già -->
+    <script src="pdf-lib.min.js"></script>
+    <!-- Caricamento online di PDF.js (Evita di caricare cartelle pesanti su GitHub) -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
-    <h1>PDF Orientation</h1>
+    <h1>PDF Tool per InDesign</h1>
 
     <div class="container">
-
-        <label>Carica PDF:</label>
+        <!-- SELEZIONE FILE PRINCIPALE -->
+        <h2>Seleziona PDF</h2>
         <input type="file" id="pdfInput" accept="application/pdf">
 
-        <label>Pagina iniziale:</label>
-        <input type="number" id="startPage" value="1">
+        <!-- 1. ROTAZIONE AUTOMATICA -->
+        <h2>Rotazione Automatica</h2>
+        <button id="autoRotateBtn">Raddrizza Pagine Orizzontali</button>
 
-        <label>Pagina finale:</label>
-        <input type="number" id="endPage" value="9999">
+        <!-- SOSTITUZIONE SCANSIONI (Estrazione singole immagini HD) -->
+        <h2>Sostituzione Scansioni</h2>
+        <label for="extractTiffPages">Estrai pagine in HD (300 DPI):</label>
+        <input type="text" id="extractTiffPages" placeholder="Es. 1, 3-5">
+        <button id="extractTiffBtn">Esporta Immagini HD</button>
 
-        <button id="processBtn">Correggi Orientamento</button>
+        <!-- 2. ROTAZIONE MANUALE -->
+        <h2>Rotazione Manuale</h2>
+        <label for="manualPage">Numero pagina:</label>
+        <input type="number" id="manualPage" min="1" placeholder="Es. 1">
+        <label for="manualDegrees">Gradi:</label>
+        <input type="number" id="manualDegrees" placeholder="Es. 90, 180, 270">
+        <button id="manualRotateBtn">Ruota Pagina</button>
 
-        <a id="downloadLink" style="display:none;">Scarica PDF Corretto</a>
+        <!-- 3. ELIMINAZIONE PAGINE -->
+        <h2>Elimina Pagine</h2>
+        <label for="deletePages">Pagine da eliminare:</label>
+        <input type="text" id="deletePages" placeholder="Es. 2, 4-6">
+        <button id="deleteBtn">Elimina Pagine</button>
 
+        <!-- 4. ESTRAZIONE PAGINE -->
+        <h2>Estrai Pagine (in PDF)</h2>
+        <label for="extractPages">Intervallo pagine:</label>
+        <input type="text" id="extractPages" placeholder="Es. 1-3, 5">
+        <button id="extractBtn">Estrai Pagine</button>
+
+        <!-- 5. UNIONE PDF -->
+        <h2>Unisci più PDF</h2>
+        <input type="file" id="mergeInput" accept="application/pdf" multiple>
+        <button id="mergeBtn">Unisci PDF</button>
+
+        <!-- 6. RIORDINAMENTO PAGINE -->
+        <h2>Riordina Pagine</h2>
+        <label for="reorderPages">Nuovo ordine:</label>
+        <input type="text" id="reorderPages" placeholder="Es. 3, 2, 1, 4">
+        <button id="reorderBtn">Riordina Pagine</button>
+
+        <!-- SEZIONE CAMBIO TEMA -->
+        <h2>Interfaccia</h2>
+        <button id="themeToggleBtn" onclick="toggleTheme()">Cambia Tema 🌓</button>
+
+        <!-- LINK DOWNLOAD -->
+        <a id="downloadLink" style="display: none;"></a>
     </div>
 
-    <script src="pdf-lib.min.js"></script>
     <script src="app.js"></script>
-
 </body>
 </html>
