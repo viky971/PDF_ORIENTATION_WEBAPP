@@ -1,5 +1,15 @@
-// Configurazione standard del worker online per PDF.js (Stabile per GitHub Pages)
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cloudflare.com';
+// Configurazione del worker online per PDF.js convertito in Blob per evitare blocchi di sicurezza (CORS) su GitHub
+(async () => {
+    try {
+        const response = await fetch('https://cloudflare.com');
+        const workerCode = await response.text();
+        const workerBlob = new Blob([workerCode], { type: 'text/javascript' });
+        pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
+        console.log("Worker PDF.js configurato con successo via Blob URL.");
+    } catch (e) {
+        console.error("Errore nell'inizializzazione del worker online:", e);
+    }
+})();
 
 // -------------------------------
 // ROTAZIONE AUTOMATICA (CORRETTA)
@@ -214,12 +224,12 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS (CON CONFRONTO INDICE BLINDATO)
+// EVENT LISTENERS (CORRETTI CON L'INDICE ZERO)
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // Estrae il file singolo reale
+    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
@@ -228,7 +238,7 @@ document.getElementById("autoRotateBtn").addEventListener("click", async () => {
 document.getElementById("manualRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
+    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
 
     const page = parseInt(document.getElementById("manualPage").value);
     const degrees = parseInt(document.getElementById("manualDegrees").value);
@@ -241,7 +251,7 @@ document.getElementById("manualRotateBtn").addEventListener("click", async () =>
 document.getElementById("deleteBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
+    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
 
     const pages = document.getElementById("deletePages").value;
 
@@ -253,65 +263,52 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
 document.getElementById("extractBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
-
+    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    
     const pages = document.getElementById("extractPages").value;
-
+    
     const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
     const newPdf = await extractPages(pdfDoc, pages);
     download(await newPdf.save(), "PDF_estratto.pdf");
-});
+    });
 
-document.getElementById("extractTiffBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // Estrae il file singolo reale
+    document.getElementById("extractTiffBtn").addEventListener("click", async () => {
+        const input = document.getElementById("pdfInput");
+        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+        const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
 
-    const pages = document.getElementById("extractTiffPages").value;
-    if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
+        const pages = document.getElementById("extractTiffPages").value;
+        if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
 
-    await exportPagesToImages(file, pages);
-});
+        await exportPagesToImages(file, pages);
+    });
 
-document.getElementById("extractTiffBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    
-    // NOTA: Aggiungiamo [0] alla fine per estrarre il singolo file reale dalla lista
-    const file = input.files[0];
+    document.getElementById("mergeBtn").addEventListener("click", async () => {
+        const files = document.getElementById("mergeInput").files;
+        if (!files || files.length === 0) return alert("Carica almeno due PDF");
 
-    const pages = document.getElementById("extractTiffPages").value;
-    if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
+        const newPdf = await mergePDFs(files);
+        download(await newPdf.save(), "PDF_unito.pdf");
+    });
 
-    await exportPagesToImages(file, pages);
-});
+    document.getElementById("reorderBtn").addEventListener("click", async () => {
+        const input = document.getElementById("pdfInput");
+        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+        const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
 
-document.getElementById("mergeBtn").addEventListener("click", async () => {
-    const files = document.getElementById("mergeInput").files;
-    if (!files || files.length === 0) return alert("Carica almeno due PDF");
-    
-    const newPdf = await mergePDFs(files);
-    download(await newPdf.save(), "PDF_unito.pdf");
-});
-    
-document.getElementById("reorderBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
-    
-    const order = document.getElementById("reorderPages").value;
-    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-    const newPdf = await reorderPages(pdfDoc, order);
-    download(await newPdf.save(), "PDF_riordinato.pdf");
-});
+        const order = document.getElementById("reorderPages").value;
+        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+        const newPdf = await reorderPages(pdfDoc, order);
+        download(await newPdf.save(), "PDF_riordinato.pdf");
+    });
 
-// Inizializzazione tema all'avvio
-(() => {
-    const saved = localStorage.getItem("theme");
-    if (saved) {
-        document.documentElement.setAttribute("data-theme", saved);
-    } else {
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
-    }
-})();
+    // Inizializzazione tema all'avvio
+    (() => {
+        const saved = localStorage.getItem("theme");
+        if (saved) {
+            document.documentElement.setAttribute("data-theme", saved);
+        } else {
+            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
+        }
+    })();
