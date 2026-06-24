@@ -282,14 +282,16 @@ document.getElementById("mergeBtn").addEventListener("click", async () => {
     if (!files || files.length === 0) return alert("Carica almeno due PDF");
     
     const newPdf = await mergePDFs(files);
-    download(await newPdf.save(), "PDF_unito.pdf");});
+    download(await newPdf.save(), "PDF_unito.pdf");
+});
     
-    document.getElementById("reorderBtn").addEventListener("click", async () => {
-        const input = document.getElementById("pdfInput");
-        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-        const file = input.files[0];
-        
-        const order = document.getElementById("reorderPages").value;
-        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-        const newPdf = await reorderPages(pdfDoc, order);
-        download(await newPdf.save(), "PDF_riordinato.pdf");});
+document.getElementById("reorderBtn").addEventListener("click", async () => {
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0];
+    
+    const order = document.getElementById("reorderPages").value;
+    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+    const newPdf = await reorderPages(pdfDoc, order);
+    download(await newPdf.save(), "PDF_riordinato.pdf");
+});
