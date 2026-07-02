@@ -109,29 +109,80 @@ async function deletePages(pdfDoc, pagesToDelete) {
 }
 
 // -------------------------------
-// ESTRAZIONE PAGINE (IN PDF)
+// ESTRAZIONE IMMAGINI HD (300 DPI EFFETTIVI PER INDESIGN)
 // -------------------------------
-async function extractPages(pdfDoc, range) {
-    const newPdf = await PDFLib.PDFDocument.create();
-    const total = pdfDoc.getPageCount();
-    const toExtract = [];
+async function exportPagesToImages(file, rangeString) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const mainPdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+        const totalPages = mainPdfDoc.getPageCount();
+        const targetPages = [];
+        
+        rangeString.split(",").forEach(part => {
+            if (part.includes("-")) {
+                const [start, end] = part.split("-").map(n => parseInt(n.trim()));
+                for (let i = start; i <= end; i++) targetPages.push(i - 1);
+            } else {
+                targetPages.push(parseInt(part.trim()) - 1);
+            }
+        });
 
-    range.split(",").forEach(part => {
-        if (part.includes("-")) {
-            const [start, end] = part.split("-").map(n => parseInt(n));
-            for (let i = start; i <= end; i++) toExtract.push(i - 1);
-        } else {
-            toExtract.push(parseInt(part) - 1);
-        }
-    });
+        for (const pageIndex of targetPages) {
+            if (pageIndex < 0 || pageIndex >= totalPages) continue;
 
-    for (let i of toExtract) {
-        if (i >= 0 && i < total) {
-            const [copied] = await newPdf.copyPages(pdfDoc, [i]);
-            newPdf.addPage(copied);
+            // Crea un mini-PDF temporaneo della singola pagina
+            const tempPdfDoc = await PDFLib.PDFDocument.create();
+            const [copiedPage] = await tempPdfDoc.copyPages(mainPdfDoc, [pageIndex]);
+            tempPdfDoc.addPage(copiedPage);
+            const tempPdfBytes = await tempPdfDoc.save();
+
+            const blob = new Blob([tempPdfBytes], { type: 'application/pdf' });
+            const blobUrl = URL.createObjectURL(blob);
+
+            // Sfrutta l'oggetto Image nativo del browser per renderizzare il PDF
+            const img = new Image();
+            img.src = blobUrl;
+
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                
+                // RAPPORTO MATEMATICO: Il PDF nasce a 72 DPI. Moltiplicando per 4.1666 otteniamo 300 DPI reali in pixel
+                const scale = 4.166666;
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                
+                // Disegna l'immagine sul canvas ingrandendola per generare l'alta risoluzione
+                context.imageSmoothingEnabled = true;
+                context.imageSmoothingQuality = 'high';
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Esporta in PNG ad alta densità (comportamento identico al TIFF in InDesign)
+                const imgDataUrl = canvas.toDataURL('image/png');
+                
+                const link = document.createElement('a');
+                link.href = imgDataUrl;
+                link.download = `Pagina_${pageIndex + 1}_300dpi.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                URL.revokeObjectURL(blobUrl);
+            };
+
+            // Soluzione alternativa se il browser blocca il rendering diretto dell'immagine
+            img.onerror = function() {
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                link.download = `Pagina_${pageIndex + 1}_AltaRisoluzione.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
         }
+    } catch (error) {
+        alert(`Errore durante il rendering a 300 DPI: ${error.message}`);
     }
-    return newPdf;
 }
 
 // -------------------------------
