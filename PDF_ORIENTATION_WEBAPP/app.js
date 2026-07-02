@@ -26,7 +26,7 @@ async function normalizePdfOrientation(file) {
 }
 
 // -------------------------------
-// ESTRAZIONE IMMAGINI HD (300 DPI REALI IN PNG) - METODO COMPATIBILE GITHUB
+// ESTRAZIONE IMMAGINI HD (300 DPI REALI IN PNG VIA FILEREADER)
 // -------------------------------
 async function exportPagesToImages(file, rangeString) {
     try {
@@ -47,68 +47,53 @@ async function exportPagesToImages(file, rangeString) {
         for (const pageIndex of targetPages) {
             if (pageIndex < 0 || pageIndex >= totalPages) continue;
 
-            // Estrae la singola pagina geometrica dal PDF originale
+            // Estrae la singola pagina geometrica pulita
             const tempPdfDoc = await PDFLib.PDFDocument.create();
             const [copiedPage] = await tempPdfDoc.copyPages(mainPdfDoc, [pageIndex]);
-            
-            // Recupera le dimensioni reali in punti tipografici (1 punto = 1/72 di pollice)
-            const { width, height } = copiedPage.getSize();
             tempPdfDoc.addPage(copiedPage);
             const tempPdfBytes = await tempPdfDoc.save();
 
-            // Trasforma i dati binari del PDF in una stringa di testo sicuro (Base64)
-            const base64Data = btoa(String.fromCharCode(...new Uint8Array(tempPdfBytes)));
+            // Trasforma i dati binari in un oggetto BLOB standard accettato dal browser
+            const blob = new Blob([tempPdfBytes], { type: 'application/pdf' });
             
-            // Crea una struttura XML/SVG virtuale. Questo dice al browser di trattare il foglio
-            // non come un PDF bloccato, ma come un disegno vettoriale standard apribile.
-            const svgString = `<svg xmlns="http://w3.org" width="${width}" height="${height}">
-                <foreignObject width="100%" height="100%">
-                    <embed xmlns="http://w3.org" src="data:application/pdf;base64,${base64Data}" style="width:100%; height:100%; border:none;"/>
-                </foreignObject>
-            </svg>`;
-
-            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-            const blobUrl = URL.createObjectURL(svgBlob);
-
-            const img = new Image();
-            img.src = blobUrl;
-
-            img.onload = function() {
+            // Sfrutta il FileReader nativo (nessun blocco CORS o Timeout su GitHub)
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            
+            reader.onloadend = function() {
+                const base64Data = reader.result;
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
+                const img = new Image();
+                img.src = base64Data;
                 
-                // COEFFICIENTE MATEMATICO: Moltiplicando le dimensioni native (72 DPI) per 4.16666,
-                // il Canvas genera un reticolo di pixel equivalente a 300 DPI reali pronto per la stampa.
-                const scale = 4.166666;
-                canvas.width = width * scale;
-                canvas.height = height * scale;
-                
-                context.imageSmoothingEnabled = true;
-                context.imageSmoothingQuality = 'high';
-                
-                // Disegna la grafica vettoriale sul Canvas ingrandendola ad altissima densità
-                context.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                // Converte l'output in un file PNG non compresso (resa speculare a un TIFF in InDesign)
-                const imgDataUrl = canvas.toDataURL('image/png');
-                
-                const link = document.createElement('a');
-                link.href = imgDataUrl;
-                link.download = `Pagina_${pageIndex + 1}_300dpi.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                URL.revokeObjectURL(blobUrl);
-            };
-            
-            img.onerror = function() {
-                alert(`Errore di sicurezza del browser sul rendering della pagina ${pageIndex + 1}.`);
-                URL.revokeObjectURL(blobUrl);
+                img.onload = function() {
+                    // COEFFICIENTE MATEMATICO: Moltiplicando le dimensioni native (72 DPI) per 4.16666,
+                    // il Canvas genera un reticolo di pixel equivalente a 300 DPI professionali per InDesign
+                    const scale = 4.166666;
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    
+                    context.imageSmoothingEnabled = true;
+                    context.imageSmoothingQuality = 'high';
+                    
+                    // Rasterizza la pagina ad altissima definizione
+                    context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Esporta l'immagine PNG pulita ad alta densità
+                    const imgDataUrl = canvas.toDataURL('image/png');
+                    
+                    const link = document.createElement('a');
+                    link.href = imgDataUrl;
+                    link.download = `Pagina_${pageIndex + 1}_300dpi.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                };
             };
         }
     } catch (error) {
-        alert(`Errore nell'estrazione: ${error.message}`);
+        alert(`Errore nell'estrazione HD: ${error.message}`);
     }
 }
 
@@ -225,7 +210,7 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS
+// EVENT LISTENERS BLINDATI CON INDICE ZERO REAL-TIME
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
@@ -253,27 +238,27 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
     const file = input.files[0];
-    
+
     const pages = document.getElementById("deletePages").value;
     const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-        const newPdf = await deletePages(pdfDoc, pages);
-        download(await newPdf.save(), "PDF_senza_pagine.pdf");
-    });
+    const newPdf = await deletePages(pdfDoc, pages);
+    download(await newPdf.save(), "PDF_senza_pagine.pdf");
+});
 
-    document.getElementById("extractBtn").addEventListener("click", async () => {
-        const input = document.getElementById("pdfInput");
-        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-        const file = input.files[0];
+document.getElementById("extractBtn").addEventListener("click", async () => {
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+    const file = input.files[0];
 
-        const pages = document.getElementById("extractPages").value;
-        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-        const newPdf = await extractPages(pdfDoc, pages);
-        download(await newPdf.save(), "PDF_estratto.pdf");
-    });
+    const pages = document.getElementById("extractPages").value;
+    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+    const newPdf = await extractPages(pdfDoc, pages);
+    download(await newPdf.save(), "PDF_estratto.pdf");
+});
 
-    document.getElementById("extractTiffBtn").addEventListener("click", async () => {
-        const input = document.getElementById("pdfInput");
-        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+document.getElementById("extractTiffBtn").addEventListener("click", async () => {
+    const input = document.getElementById("pdfInput");
+    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
         const file = input.files[0];
 
         const pages = document.getElementById("extractTiffPages").value;
