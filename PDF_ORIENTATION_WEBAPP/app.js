@@ -10,79 +10,66 @@ async function normalizePdfOrientation(file) {
         const page = pdfDoc.getPage(i);
         const { width, height } = page.getSize();
         
+        // Normalizza la rotazione corrente tra 0 e 360 gradi
         let currentRotation = (page.getRotation()?.angle || 0) % 360;
         if (currentRotation < 0) currentRotation += 360;
 
+        console.log("Pagina", i + 1, { width, height, rotation: currentRotation });
+
+        // Rileva l'orientamento reale geometrico del foglio
         const isLandscape = (currentRotation === 0 || currentRotation === 180)
             ? (width > height)
             : (height > width);
 
         if (isLandscape) {
+            // Calcolo relativo della rotazione per raddrizzare a foglio verticale
             let targetRotation = (currentRotation + 270) % 360;
             page.setRotation(PDFLib.degrees(targetRotation));
         }
     }
-
     return await pdfDoc.save();
 }
 
 // -------------------------------
-// ESTRAZIONE PAGINE AD ALTA DEFINIZIONE VETTORIALE PER INDESIGN
+// ESTRAZIONE PAGINE HD VETTORIALI PER INDESIGN
 // -------------------------------
 async function exportPagesToImages(file, rangeString) {
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const mainPdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-        const totalPages = mainPdfDoc.getPageCount();
-        const targetPages = [];
+    const arrayBuffer = await file.arrayBuffer();
+    const mainPdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+    const totalPages = mainPdfDoc.getPageCount();
+    const targetPages = [];
+    
+    // Parsifica la stringa (es: "1,3-5")
+    rangeString.split(",").forEach(part => {
+        if (part.includes("-")) {
+            const [start, end] = part.split("-").map(n => parseInt(n.trim()));
+            for (let i = start; i <= end; i++) targetPages.push(i - 1);
+        } else {
+            targetPages.push(parseInt(part.trim()) - 1);
+        }
+    });
+
+    for (const pageIndex of targetPages) {
+        if (pageIndex < 0 || pageIndex >= totalPages) continue;
+
+        // Crea un PDF singolo contenente esclusivamente la pagina selezionata
+        const tempPdfDoc = await PDFLib.PDFDocument.create();
+        const [copiedPage] = await tempPdfDoc.copyPages(mainPdfDoc, [pageIndex]);
+        tempPdfDoc.addPage(copiedPage);
+        const tempPdfBytes = await tempPdfDoc.save();
+
+        // Genera il download diretto del singolo foglio ad altissima definizione vettoriale (ideale per InDesign)
+        const blob = new Blob([tempPdfBytes], { type: "application/pdf" });
+        const blobUrl = URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = `Pagina_${pageIndex + 1}_AltaDefinizione.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         
-        // Parsifica la stringa delle pagine (es. "1, 3-5")
-        rangeString.split(",").forEach(part => {
-            if (part.includes("-")) {
-                const [start, end] = part.split("-").map(n => parseInt(n.trim()));
-                for (let i = start; i <= end; i++) targetPages.push(i - 1); // Indice JavaScript parte da 0
-            } else {
-                targetPages.push(parseInt(part.trim()) - 1);
-            }
-        });
-
-        let pagineElaborate = 0;
-
-        for (const pageIndex of targetPages) {
-            if (pageIndex < 0 || pageIndex >= totalPages) {
-                alert(`La pagina ${pageIndex + 1} non esiste in questo PDF.`);
-                continue;
-            }
-
-            // Crea un nuovo documento PDF per la singola pagina da sostituire
-            const singlePageDoc = await PDFLib.PDFDocument.create();
-            const [copiedPage] = await singlePageDoc.copyPages(mainPdfDoc, [pageIndex]);
-            singlePageDoc.addPage(copiedPage);
-            
-            const singlePageBytes = await singlePageDoc.save();
-
-            // Avvia il download immediato del singolo foglio HD
-            const blob = new Blob([singlePageBytes], { type: "application/pdf" });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = `Pagina_${pageIndex + 1}_AltaDefinizione.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            URL.revokeObjectURL(url);
-            pagineElaborate++;
-        }
-
-        if (pagineElaborate === 0) {
-            alert("Nessuna pagina valida è stata inserita.");
-        }
-
-    } catch (error) {
-        console.error("Errore durante l'estrazione delle pagine:", error);
-        alert(`Si è verificato un errore durante l'estrazione: ${error.message}`);
+        URL.revokeObjectURL(blobUrl);
     }
 }
 
@@ -118,12 +105,11 @@ async function deletePages(pdfDoc, pagesToDelete) {
             newPdf.addPage(copied);
         }
     }
-
     return newPdf;
 }
 
 // -------------------------------
-// ESTRAZIONE INTERVALLO PAGINE (IN PDF)
+// ESTRAZIONE PAGINE (IN PDF)
 // -------------------------------
 async function extractPages(pdfDoc, range) {
     const newPdf = await PDFLib.PDFDocument.create();
@@ -145,7 +131,6 @@ async function extractPages(pdfDoc, range) {
             newPdf.addPage(copied);
         }
     }
-
     return newPdf;
 }
 
@@ -154,15 +139,12 @@ async function extractPages(pdfDoc, range) {
 // -------------------------------
 async function mergePDFs(files) {
     const merged = await PDFLib.PDFDocument.create();
-
     for (let file of files) {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
-
         const pages = await merged.copyPages(pdf, pdf.getPageIndices());
         pages.forEach(p => merged.addPage(p));
     }
-
     return merged;
 }
 
@@ -177,7 +159,6 @@ async function reorderPages(pdfDoc, orderString) {
         const [copied] = await newPdf.copyPages(pdfDoc, [index]);
         newPdf.addPage(copied);
     }
-
     return newPdf;
 }
 
@@ -197,7 +178,6 @@ function toggleTheme() {
 function download(bytes, filename) {
     const blob = new Blob([bytes], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);
-
     const link = document.getElementById("downloadLink");
     link.href = url;
     link.download = filename;
@@ -206,12 +186,12 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS
+// EVENT LISTENERS BLINDATI CON INDICE [0]
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files;
+    const file = input.files[0]; // Estrae il file singolo reale
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
@@ -220,7 +200,7 @@ document.getElementById("autoRotateBtn").addEventListener("click", async () => {
 document.getElementById("manualRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files;
+    const file = input.files[0];
 
     const page = parseInt(document.getElementById("manualPage").value);
     const degrees = parseInt(document.getElementById("manualDegrees").value);
@@ -233,10 +213,9 @@ document.getElementById("manualRotateBtn").addEventListener("click", async () =>
 document.getElementById("deleteBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files;
+    const file = input.files[0];
 
     const pages = document.getElementById("deletePages").value;
-
     const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
     const newPdf = await deletePages(pdfDoc, pages);
     download(await newPdf.save(), "PDF_senza_pagine.pdf");
@@ -245,10 +224,9 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
 document.getElementById("extractBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files;
-    
+    const file = input.files[0];
+
     const pages = document.getElementById("extractPages").value;
-    
     const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
     const newPdf = await extractPages(pdfDoc, pages);
     download(await newPdf.save(), "PDF_estratto.pdf");
@@ -257,7 +235,7 @@ document.getElementById("extractBtn").addEventListener("click", async () => {
 document.getElementById("extractTiffBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files;
+    const file = input.files[0];
 
     const pages = document.getElementById("extractTiffPages").value;
     if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
@@ -276,14 +254,15 @@ document.getElementById("mergeBtn").addEventListener("click", async () => {
 document.getElementById("reorderBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files;
-    const order = document.getElementById("reorderPages").value;
-        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-        const newPdf = await reorderPages(pdfDoc, order);
-        download(await newPdf.save(), "PDF_riordinato.pdf");
-    });
+    const file = input.files[0];
 
-    document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
+    const order = document.getElementById("reorderPages").value;
+    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+    const newPdf = await reorderPages(pdfDoc, order);
+    download(await newPdf.save(), "PDF_riordinato.pdf");
+});
+
+document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
 
     // Inizializzazione tema all'avvio
     (() => {
