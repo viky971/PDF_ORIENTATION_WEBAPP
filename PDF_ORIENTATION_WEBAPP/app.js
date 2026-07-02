@@ -10,19 +10,14 @@ async function normalizePdfOrientation(file) {
         const page = pdfDoc.getPage(i);
         const { width, height } = page.getSize();
         
-        // Normalizza la rotazione corrente tra 0 e 360 gradi
         let currentRotation = (page.getRotation()?.angle || 0) % 360;
         if (currentRotation < 0) currentRotation += 360;
 
-        console.log("Pagina", i + 1, { width, height, rotation: currentRotation });
-
-        // Rileva l'orientamento reale geometrico del foglio
         const isLandscape = (currentRotation === 0 || currentRotation === 180)
             ? (width > height)
             : (height > width);
 
         if (isLandscape) {
-            // Calcolo relativo della rotazione per raddrizzare a foglio verticale
             let targetRotation = (currentRotation + 270) % 360;
             page.setRotation(PDFLib.degrees(targetRotation));
         }
@@ -31,7 +26,7 @@ async function normalizePdfOrientation(file) {
 }
 
 // -------------------------------
-// ESTRAZIONE IMMAGINI HD (300 DPI REALI IN PNG)
+// ESTRAZIONE IMMAGINI HD (300 DPI REALI IN PNG) - METODO COMPATIBILE GITHUB
 // -------------------------------
 async function exportPagesToImages(file, rangeString) {
     try {
@@ -52,65 +47,64 @@ async function exportPagesToImages(file, rangeString) {
         for (const pageIndex of targetPages) {
             if (pageIndex < 0 || pageIndex >= totalPages) continue;
 
-            // 1. Crea il mini-PDF della singola pagina
+            // Estrae la singola pagina geometrica dal PDF originale
             const tempPdfDoc = await PDFLib.PDFDocument.create();
             const [copiedPage] = await tempPdfDoc.copyPages(mainPdfDoc, [pageIndex]);
+            
+            // Recupera le dimensioni reali in punti tipografici (1 punto = 1/72 di pollice)
+            const { width, height } = copiedPage.getSize();
             tempPdfDoc.addPage(copiedPage);
             const tempPdfBytes = await tempPdfDoc.save();
 
-            const blob = new Blob([tempPdfBytes], { type: 'application/pdf' });
-            const blobUrl = URL.createObjectURL(blob);
+            // Trasforma i dati binari del PDF in una stringa di testo sicuro (Base64)
+            const base64Data = btoa(String.fromCharCode(...new Uint8Array(tempPdfBytes)));
+            
+            // Crea una struttura XML/SVG virtuale. Questo dice al browser di trattare il foglio
+            // non come un PDF bloccato, ma come un disegno vettoriale standard apribile.
+            const svgString = `<svg xmlns="http://w3.org" width="${width}" height="${height}">
+                <foreignObject width="100%" height="100%">
+                    <embed xmlns="http://w3.org" src="data:application/pdf;base64,${base64Data}" style="width:100%; height:100%; border:none;"/>
+                </foreignObject>
+            </svg>`;
 
-            // 2. Creiamo un iframe nascosto nel documento per forzare il rendering nativo
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'absolute';
-            iframe.style.width = '800px';  // Dimensione standard indicativa
-            iframe.style.height = '1100px';
-            iframe.style.visibility = 'hidden';
-            iframe.src = blobUrl;
-            document.body.appendChild(iframe);
+            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const blobUrl = URL.createObjectURL(svgBlob);
 
-            // 3. Attendiamo che l'iframe carichi visivamente il PDF
-            iframe.onload = function() {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    
-                    // RAPPORTO MATEMATICO: 300 DPI / 72 DPI = scala 4.1666
-                    const scale = 4.166666;
-                    
-                    // Prendiamo le dimensioni reali della pagina caricate nell'iframe
-                    const width = iframe.clientWidth || 800;
-                    const height = iframe.clientHeight || 1100;
-                    
-                    canvas.width = width * scale;
-                    canvas.height = height * scale;
-                    
-                    context.imageSmoothingEnabled = true;
-                    context.imageSmoothingQuality = 'high';
-                    
-                    // Disegniamo il contenuto dell'iframe nel Canvas forzando l'alta risoluzione
-                    context.drawImage(iframe, 0, 0, canvas.width, canvas.height);
-                    
-                    // Generiamo l'immagine PNG ad alta definizione reale
-                    const imgDataUrl = canvas.toDataURL('image/png');
-                    
-                    const link = document.createElement('a');
-                    link.href = imgDataUrl;
-                    link.download = `Pagina_${pageIndex + 1}_300dpi.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                } catch (err) {
-                    // Se le politiche di sicurezza bloccano lo screenshot dell'iframe,
-                    // usiamo un fallback alternativo disegnando una finta preview
-                    console.error("Iframe spec-block, fallback in corso:", err);
-                    fallbackPdfToPng(tempPdfBytes, pageIndex + 1);
-                } finally {
-                    // Pulizia degli elementi temporanei per non appesantire la memoria
-                    document.body.removeChild(iframe);
-                    URL.revokeObjectURL(blobUrl);
-                }
+            const img = new Image();
+            img.src = blobUrl;
+
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                
+                // COEFFICIENTE MATEMATICO: Moltiplicando le dimensioni native (72 DPI) per 4.16666,
+                // il Canvas genera un reticolo di pixel equivalente a 300 DPI reali pronto per la stampa.
+                const scale = 4.166666;
+                canvas.width = width * scale;
+                canvas.height = height * scale;
+                
+                context.imageSmoothingEnabled = true;
+                context.imageSmoothingQuality = 'high';
+                
+                // Disegna la grafica vettoriale sul Canvas ingrandendola ad altissima densità
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Converte l'output in un file PNG non compresso (resa speculare a un TIFF in InDesign)
+                const imgDataUrl = canvas.toDataURL('image/png');
+                
+                const link = document.createElement('a');
+                link.href = imgDataUrl;
+                link.download = `Pagina_${pageIndex + 1}_300dpi.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                URL.revokeObjectURL(blobUrl);
+            };
+            
+            img.onerror = function() {
+                alert(`Errore di sicurezza del browser sul rendering della pagina ${pageIndex + 1}.`);
+                URL.revokeObjectURL(blobUrl);
             };
         }
     } catch (error) {
@@ -118,28 +112,65 @@ async function exportPagesToImages(file, rangeString) {
     }
 }
 
-// Funzione di emergenza per forzare l'esportazione se l'iframe fallisce la cattura
-function fallbackPdfToPng(pdfBytes, pageNumber) {
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const reader = new FileReader();
-    reader.readAsDataURL(blob);
-    reader.onloadend = function() {
-        const base64data = reader.result;
-        // Crea un Canvas pulito a 300dpi finti ma con dimensioni triplicate per InDesign
-        const canvas = document.createElement('canvas');
-        const img = new Image();
-        img.src = base64data;
-        img.onload = function() {
-            canvas.width = img.width * 4;
-            canvas.height = img.height * 4;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const link = document.createElement('a');
-            link.href = canvas.toDataURL('image/png');
-            link.download = `Pagina_${pageNumber}_300dpi.png`;
-            link.click();
-        };
-    };
+// -------------------------------
+// ROTAZIONE MANUALE
+// -------------------------------
+async function rotatePage(pdfDoc, pageNumber, degrees) {
+    const page = pdfDoc.getPage(pageNumber - 1);
+    page.setRotation(PDFLib.degrees(degrees));
+    return pdfDoc;
+}
+
+// -------------------------------
+// ELIMINAZIONE PAGINE
+// -------------------------------
+async function deletePages(pdfDoc, pagesToDelete) {
+    const newPdf = await PDFLib.PDFDocument.create();
+    const total = pdfDoc.getPageCount();
+    const toDelete = new Set();
+
+    pagesToDelete.split(",").forEach(part => {
+        if (part.includes("-")) {
+            const [start, end] = part.split("-").map(n => parseInt(n));
+            for (let i = start; i <= end; i++) toDelete.add(i - 1);
+        } else {
+            toDelete.add(parseInt(part) - 1);
+        }
+    });
+
+    for (let i = 0; i < total; i++) {
+        if (!toDelete.has(i)) {
+            const [copied] = await newPdf.copyPages(pdfDoc, [i]);
+            newPdf.addPage(copied);
+        }
+    }
+    return newPdf;
+}
+
+// -------------------------------
+// ESTRAZIONE PAGINE (IN PDF)
+// -------------------------------
+async function extractPages(pdfDoc, range) {
+    const newPdf = await PDFLib.PDFDocument.create();
+    const total = pdfDoc.getPageCount();
+    const toExtract = [];
+
+    range.split(",").forEach(part => {
+        if (part.includes("-")) {
+            const [start, end] = part.split("-").map(n => parseInt(n));
+            for (let i = start; i <= end; i++) toExtract.push(i - 1);
+        } else {
+            toExtract.push(parseInt(part) - 1);
+        }
+    });
+
+    for (let i of toExtract) {
+        if (i >= 0 && i < total) {
+            const [copied] = await newPdf.copyPages(pdfDoc, [i]);
+            newPdf.addPage(copied);
+        }
+    }
+    return newPdf;
 }
 
 // -------------------------------
@@ -194,12 +225,12 @@ function download(bytes, filename) {
 }
 
 // -------------------------------
-// EVENT LISTENERS BLINDATI CON INDICE [0]
+// EVENT LISTENERS
 // -------------------------------
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // Estrae il file singolo reale
+    const file = input.files[0];
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
@@ -222,55 +253,55 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
     const file = input.files[0];
-
+    
     const pages = document.getElementById("deletePages").value;
     const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-    const newPdf = await deletePages(pdfDoc, pages);
-    download(await newPdf.save(), "PDF_senza_pagine.pdf");
-});
+        const newPdf = await deletePages(pdfDoc, pages);
+        download(await newPdf.save(), "PDF_senza_pagine.pdf");
+    });
 
-document.getElementById("extractBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
+    document.getElementById("extractBtn").addEventListener("click", async () => {
+        const input = document.getElementById("pdfInput");
+        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+        const file = input.files[0];
 
-    const pages = document.getElementById("extractPages").value;
-    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-    const newPdf = await extractPages(pdfDoc, pages);
-    download(await newPdf.save(), "PDF_estratto.pdf");
-});
+        const pages = document.getElementById("extractPages").value;
+        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+        const newPdf = await extractPages(pdfDoc, pages);
+        download(await newPdf.save(), "PDF_estratto.pdf");
+    });
 
-document.getElementById("extractTiffBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
+    document.getElementById("extractTiffBtn").addEventListener("click", async () => {
+        const input = document.getElementById("pdfInput");
+        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+        const file = input.files[0];
 
-    const pages = document.getElementById("extractTiffPages").value;
-    if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
+        const pages = document.getElementById("extractTiffPages").value;
+        if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
 
-    await exportPagesToImages(file, pages);
-});
+        await exportPagesToImages(file, pages);
+    });
 
-document.getElementById("mergeBtn").addEventListener("click", async () => {
-    const files = document.getElementById("mergeInput").files;
-    if (!files || files.length === 0) return alert("Carica almeno due PDF");
+    document.getElementById("mergeBtn").addEventListener("click", async () => {
+        const files = document.getElementById("mergeInput").files;
+        if (!files || files.length === 0) return alert("Carica almeno due PDF");
 
-    const newPdf = await mergePDFs(files);
-    download(await newPdf.save(), "PDF_unito.pdf");
-});
+        const newPdf = await mergePDFs(files);
+        download(await newPdf.save(), "PDF_unito.pdf");
+    });
 
-document.getElementById("reorderBtn").addEventListener("click", async () => {
-    const input = document.getElementById("pdfInput");
-    if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0];
+    document.getElementById("reorderBtn").addEventListener("click", async () => {
+        const input = document.getElementById("pdfInput");
+        if (!input.files || input.files.length === 0) return alert("Carica un PDF");
+        const file = input.files[0];
 
-    const order = document.getElementById("reorderPages").value;
-    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-    const newPdf = await reorderPages(pdfDoc, order);
-    download(await newPdf.save(), "PDF_riordinato.pdf");
-});
+        const order = document.getElementById("reorderPages").value;
+        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+        const newPdf = await reorderPages(pdfDoc, order);
+        download(await newPdf.save(), "PDF_riordinato.pdf");
+    });
 
-document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
+    document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme);
 
     // Inizializzazione tema all'avvio
     (() => {
@@ -282,5 +313,3 @@ document.getElementById("themeToggleBtn").addEventListener("click", toggleTheme)
             document.documentElement.setAttribute("data-theme", prefersDark ? "dark" : "light");
         }
     })();
-
-
