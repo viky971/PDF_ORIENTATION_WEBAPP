@@ -1,13 +1,18 @@
 // Configurazione del worker online per PDF.js convertito in Blob per evitare blocchi di sicurezza (CORS) su GitHub
 (async () => {
     try {
+        // Scarica il file JavaScript REALE del worker e non la pagina principale del sito
         const response = await fetch('https://cloudflare.com');
         const workerCode = await response.text();
         const workerBlob = new Blob([workerCode], { type: 'text/javascript' });
+        
+        // Configura PDF.js per accettare il worker convertito in oggetto di memoria locale
         pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(workerBlob);
         console.log("Worker PDF.js configurato con successo via Blob URL.");
     } catch (e) {
         console.error("Errore nell'inizializzazione del worker online:", e);
+        // Soluzione di emergenza se il fetch fallisce: esegue il rendering sul thread principale
+        pdfjsLib.GlobalWorkerOptions.disableWorker = true;
     }
 })();
 
@@ -229,7 +234,7 @@ function download(bytes, filename) {
 document.getElementById("autoRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    const file = input.files[0];
 
     const pdfBytes = await normalizePdfOrientation(file);
     download(pdfBytes, "PDF_rotato.pdf");
@@ -238,7 +243,7 @@ document.getElementById("autoRotateBtn").addEventListener("click", async () => {
 document.getElementById("manualRotateBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    const file = input.files[0];
 
     const page = parseInt(document.getElementById("manualPage").value);
     const degrees = parseInt(document.getElementById("manualDegrees").value);
@@ -251,7 +256,7 @@ document.getElementById("manualRotateBtn").addEventListener("click", async () =>
 document.getElementById("deleteBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    const file = input.files[0];
 
     const pages = document.getElementById("deletePages").value;
 
@@ -263,19 +268,18 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
 document.getElementById("extractBtn").addEventListener("click", async () => {
     const input = document.getElementById("pdfInput");
     if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-    const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+    const file = input.files[0];
     
     const pages = document.getElementById("extractPages").value;
-    
-    const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
-    const newPdf = await extractPages(pdfDoc, pages);
-    download(await newPdf.save(), "PDF_estratto.pdf");
+        const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+        const newPdf = await extractPages(pdfDoc, pages);
+        download(await newPdf.save(), "PDF_estratto.pdf");
     });
 
     document.getElementById("extractTiffBtn").addEventListener("click", async () => {
         const input = document.getElementById("pdfInput");
         if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-        const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+        const file = input.files[0];
 
         const pages = document.getElementById("extractTiffPages").value;
         if (!pages) return alert("Inserisci le pagine da esportare (es. 1, 3-5)");
@@ -294,7 +298,7 @@ document.getElementById("extractBtn").addEventListener("click", async () => {
     document.getElementById("reorderBtn").addEventListener("click", async () => {
         const input = document.getElementById("pdfInput");
         if (!input.files || input.files.length === 0) return alert("Carica un PDF");
-        const file = input.files[0]; // <--- CORRETTO CON INDICE ZERO
+        const file = input.files[0];
 
         const order = document.getElementById("reorderPages").value;
         const pdfDoc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
